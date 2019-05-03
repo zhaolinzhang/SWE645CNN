@@ -1,12 +1,10 @@
 import tensorflow as tf
 import numpy as np
 import pandas as pd
-import cv2
-import time
-import init_model
+from PIL import Image
 
 
-def read_data(csv_file_paths):
+def read_data_array(csv_file_paths):
     image_path_collection = []
     image_class_collection = []
 
@@ -27,10 +25,9 @@ def read_data(csv_file_paths):
 
     image_collection = []
     for i in range(len(image_path_collection)):
-        image = cv2.imread(image_path_collection[i])
-        image_array = np.array(image[:, :, 0])
-        image_array_flatten = image_array.flatten()
-        image_collection.append(image_array_flatten)
+        image = Image.open(image_path_collection[i])
+        image_array = np.array(image)
+        image_collection.append(image_array)
 
     if len(image_collection) == len(image_class_collection):
         return np.array(image_collection), np.array(image_class_collection)
@@ -39,40 +36,45 @@ def read_data(csv_file_paths):
 
 
 def continue_train():
-    tf.set_random_seed(time.time())
-    np.random.seed(int(time.time()))
+    session_conf = tf.ConfigProto(intra_op_parallelism_threads=4, inter_op_parallelism_threads=4)
+    tf.set_random_seed(1)
+    sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
+    tf.keras.backend.set_session(sess)
 
-    BATCH_SIZE = 500
+    num_classes = 43
+    input_shape = (48, 48, 1)
+    model = tf.keras.Sequential([
+        tf.keras.layers.Conv2D(filters=16, kernel_size=5, strides=1,
+                               padding='same', activation='relu', input_shape=input_shape),
+        tf.keras.layers.MaxPool2D(pool_size=2, strides=2),
+        tf.keras.layers.Dropout(0.1),
+        tf.keras.layers.Conv2D(filters=32, kernel_size=5, strides=1,
+                               padding='same', activation='relu'),
+        tf.keras.layers.MaxPool2D(pool_size=2, strides=2),
+        tf.keras.layers.Dropout(0.2),
+        tf.keras.layers.Conv2D(filters=64, kernel_size=5, strides=1,
+                               padding='same', activation='relu'),
+        tf.keras.layers.MaxPool2D(pool_size=2, strides=2),
+        tf.keras.layers.Dropout(0.3),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(num_classes, activation='softmax')
+    ])
 
-    config = tf.ConfigProto()
-    config.intra_op_parallelism_threads = 4
-    config.inter_op_parallelism_threads = 4
+    model.compile(optimizer=tf.keras.optimizers.Nadam(lr=0.0002, schedule_decay=1e-4),
+                  loss=tf.keras.losses.categorical_crossentropy, metrics=['accuracy'])
 
-    sess = tf.Session(config=config)
-    saver = tf.train.import_meta_graph('./checkpoint_dir/MyModel.meta')
-    saver.restore(sess, tf.train.latest_checkpoint('./checkpoint_dir'))
-    graph = tf.get_default_graph()
+    # import data
+    train_xs, train_ys = read_data_array(['./Train_processed.csv', './Train_processed_extend.csv'])
+    test_xs, test_ys = read_data_array(['./Test_processed.csv'])
+    train_xs = np.expand_dims(train_xs, axis=3)
+    test_xs = np.expand_dims(test_xs, axis=3)
 
-    train_op = graph.get_operation_by_name("Adam")
-    loss = graph.get_tensor_by_name("softmax_cross_entropy_loss/value:0")
-    tf_x = graph.get_tensor_by_name("truediv:0")
-    tf_y = graph.get_tensor_by_name("Placeholder_1:0")
-    flat = graph.get_tensor_by_name("Reshape_1:0")
-    accuracy = graph.get_tensor_by_name("Mean:0")
-
-    # xs_i, ys_i = read_data(['./Train_processed.csv', './Train_processed_extend.csv'])
-    xs_i, ys_i = read_data(['./Train_processed.csv'])
-    # xs_i, ys_i = read_data(['./Train_processed_extend.csv'])
-    test_xs, test_ys = read_data(['./Test_processed.csv'])
-
-    for step in range(100001):
-        batch_xs, batch_ys = init_model.next_batch(BATCH_SIZE, xs_i, ys_i)
-        _, loss_ = sess.run([train_op, loss], {tf_x: batch_xs, tf_y: batch_ys})
-        if step % 100 == 0:
-            accuracy_, flat_representation = sess.run([accuracy, flat], {tf_x: test_xs, tf_y: test_ys})
-            print('Step:', step, '| train loss: %.4f' % loss_, '| test accuracy: %.4f' % accuracy_)
-            saver.save(sess, './checkpoint_dir/MyModel')
-        time.sleep(1)
+    # run model
+    model.fit(train_xs, train_ys, batch_size=500, epochs=10, verbose=1)
+    loss, acc = model.evaluate(test_xs, test_ys)
+    print("\n\n==============================================================\n\n")
+    print("Loss {}, Accuracy {}".format(loss, acc))
+    print("\n\n==============================================================\n\n")
 
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import cv2
+from PIL import Image
 import os
 
 
@@ -10,13 +10,14 @@ def plot_images(file_path, row, col):
         if i >= row*col + 1:
             break
         if image_name.endswith('.png'):
-            img = cv2.imread(os.path.join(file_path, image_name))
+            img = Image.open(os.path.join(file_path, image_name))
             fig.add_subplot(row, col, i)
             plt.imshow(img)
             i += 1
-    plt.savefig('./image_after_extend.png')
     plt.show()
 
 
 if __name__ == '__main__':
+    plot_images('./Train/0', 4, 5)
+    plot_images('./Train_processed', 4, 5)
     plot_images('./Train_processed_extend', 4, 5)
