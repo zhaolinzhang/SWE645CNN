@@ -36,10 +36,6 @@ def read_data_array(csv_file_paths):
 
 
 def continue_train():
-    session_conf = tf.ConfigProto(intra_op_parallelism_threads=4, inter_op_parallelism_threads=4)
-    tf.set_random_seed(1)
-    sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
-    tf.keras.backend.set_session(sess)
 
     num_classes = 43
     input_shape = (48, 48, 1)

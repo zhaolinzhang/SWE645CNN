@@ -253,6 +253,12 @@ def random_scale(image_file_path, image_new_file_path, width, height, x1, y1, x2
     cv2.imwrite(image_new_file_path, resized_img)
 
 
-if __name__ == '__main__':
-    # crop_and_resize_image('./Train.csv', './Train_processed.csv', './Train_processed', 48, 48)
+def do_preprocess():
+    print("Preprocess begin...")
+    crop_and_resize_image('./Train.csv', './Train_processed.csv', './Train_processed', 48, 48)
     crop_and_resize_image_extend('./Train.csv', './Train_processed_extend.csv', './Train_processed_extend', 48, 48)
+    print("End of preprocess.")
+
+
+if __name__ == '__main__':
+    do_preprocess()
